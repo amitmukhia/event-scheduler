@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="001-enable-uuid-extension" author="event-scheduler-team">
+        <comment>Enable UUIDs extension</comment>
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+        <rollback>DROP EXTENSION IF EXISTS "uuid-ossp";</rollback>
+    </changeSet>
+
+    <changeSet id="002-create-customers-table" author="event-scheduler-team">
+        <comment>Create customers table</comment>
+        <createTable tableName="customers">
+            <column name="customer_id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email" type="VARCHAR(320)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="003-create-events-table" author="event-scheduler-team">
+        <comment>Create events table (active)</comment>
+        <createTable tableName="events">
+            <column name="event_id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="UUID">
+                <constraints nullable="false" referencedTableName="customers" referencedColumnNames="customer_id" foreignKeyName="fk_events_customer"/>
+            </column>
+            <column name="trigger_time" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="next_run_time" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_retries" type="INT" defaultValueNumeric="3">
+                <constraints nullable="false"/>
+            </column>
+            <column name="failure_count" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_attempt_time" type="TIMESTAMP"/>
+            <column name="expiration_time" type="TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_mechanism" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_mode" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recurrence" type="JSONB"/>
+            <column name="canceled_at" type="TIMESTAMP"/>
+            <column name="cancelled_by" type="UUID"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="004-create-event-history-table" author="event-scheduler-team">
+        <comment>Create event_history table (archive)</comment>
+        <createTable tableName="event_history">
+            <column name="event_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trigger_time" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completion_time" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_mechanism" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cancelled_by" type="VARCHAR(100)"/>
+            <column name="event_mode" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recurrence" type="JSONB"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="005-create-failed-events-table" author="event-scheduler-team">
+        <comment>Create failed_events table (permanent failures)</comment>
+        <createTable tableName="failed_events">
+            <column name="event_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trigger_time" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="failure_reason" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="failed_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_mode" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recurrence" type="JSONB"/>
+        </createTable>
+    </changeSet>
+
+    	<changeSet id="006-create-performance-indexes" author="event-scheduler-team" runInTransaction="false">
+        	<comment>Create performance-critical indexes</comment>
+        	<sql>
+            -- Primary use case indexes with conditional filtering
+            CREATE INDEX CONCURRENTLY idx_events_next_run_status ON events(next_run_time, status) WHERE status = 'PENDING';
+            CREATE INDEX CONCURRENTLY idx_events_stuck ON events(last_attempt_time, status) WHERE status = 'PROCESSING';
+            CREATE INDEX CONCURRENTLY idx_events_failure_count_status ON events(failure_count, status) WHERE failure_count > 0;
+            
+            -- Customer isolation indexes
+            CREATE INDEX CONCURRENTLY idx_events_customer_status ON events(customer_id, status, next_run_time);
+            CREATE INDEX CONCURRENTLY idx_events_customer ON events(customer_id);
+            
+            -- Expiration and filtering indexes
+            CREATE INDEX CONCURRENTLY idx_events_expiration ON events(expiration_time) WHERE expiration_time IS NOT NULL;
+            CREATE INDEX CONCURRENTLY idx_events_status ON events(status);
+            
+            -- Batch processing optimization
+            CREATE INDEX CONCURRENTLY idx_events_batch_claim ON events(next_run_time, created_at) WHERE status IN ('PENDING', 'PROCESSING');
+            
+            -- History and cleanup indexes
+            CREATE INDEX CONCURRENTLY idx_event_history_created ON event_history(created_at);
+            CREATE INDEX CONCURRENTLY idx_event_history_completion ON event_history(completion_time);
+            CREATE INDEX CONCURRENTLY idx_event_history_status_time ON event_history(status, completion_time);
+            CREATE INDEX CONCURRENTLY idx_event_history_customer_time ON event_history(customer_id, completion_time);
+            
+            -- Failed events indexes
+            CREATE INDEX CONCURRENTLY idx_failed_events_failed_at ON failed_events(failed_at);
+            CREATE INDEX CONCURRENTLY idx_failed_events_customer_time ON failed_events(customer_id, failed_at);
+            
+            -- Additional optimization indexes
+            CREATE INDEX CONCURRENTLY idx_events_unique_timestamps ON events(next_run_time) WHERE status = 'PENDING' AND expiration_time IS NULL;
+            CREATE INDEX CONCURRENTLY idx_events_updated ON events(updated_at);
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS idx_events_next_run_status;
+            DROP INDEX IF EXISTS idx_events_stuck;
+            DROP INDEX IF EXISTS idx_events_failure_count_status;
+            DROP INDEX IF EXISTS idx_events_customer_status;
+            DROP INDEX IF EXISTS idx_events_customer;
+            DROP INDEX IF EXISTS idx_events_expiration;
+            DROP INDEX IF EXISTS idx_events_status;
+            DROP INDEX IF EXISTS idx_events_batch_claim;
+            DROP INDEX IF EXISTS idx_event_history_created;
+            DROP INDEX IF EXISTS idx_event_history_completion;
+            DROP INDEX IF EXISTS idx_event_history_status_time;
+            DROP INDEX IF EXISTS idx_event_history_customer_time;
+            DROP INDEX IF EXISTS idx_failed_events_failed_at;
+            DROP INDEX IF EXISTS idx_failed_events_customer_time;
+            DROP INDEX IF EXISTS idx_events_unique_timestamps;
+            DROP INDEX IF EXISTS idx_events_updated;
+        </rollback>
+    </changeSet>
+
+    <changeSet id="007-analyze-tables" author="event-scheduler-team">
+        <comment>Update table statistics for query planner optimization</comment>
+        <sql>
+            ANALYZE events;
+            ANALYZE event_history;
+            ANALYZE failed_events;
+            ANALYZE customers;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="013-drop-max-retries-from-events" author="event-scheduler-team">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="events" columnName="max_retries"/>
+        </preConditions>
+        <comment>Drop max_retries column from events table after code refactor</comment>
+        <dropColumn tableName="events" columnName="max_retries"/>
+    </changeSet>
+
+    <changeSet id="014-drop-delivery-mechanism-from-events" author="event-scheduler-team">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="events" columnName="delivery_mechanism"/>
+        </preConditions>
+        <comment>Drop delivery_mechanism column from events table after code refactor</comment>
+        <dropColumn tableName="events" columnName="delivery_mechanism"/>
+    </changeSet>
+
+    <changeSet id="015-drop-delivery-mechanism-from-event-history" author="event-scheduler-team">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="event_history" columnName="delivery_mechanism"/>
+        </preConditions>
+        <comment>Drop delivery_mechanism column from event_history table after code refactor</comment>
+        <dropColumn tableName="event_history" columnName="delivery_mechanism"/>
+    </changeSet>
+
+</databaseChangeLog>

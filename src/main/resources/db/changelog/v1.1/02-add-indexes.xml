@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="017-add-additional-performance-indexes" author="event-scheduler-team">
+        <comment>Add useful indexes for query performance</comment>
+        
+        <createIndex tableName="events" indexName="idx_events_status_next_run_time">
+            <column name="status"/>
+            <column name="next_run_time"/>
+        </createIndex>
+        
+        <createIndex tableName="events" indexName="idx_events_next_run_time">
+            <column name="next_run_time"/>
+        </createIndex>
+        
+        <createIndex tableName="events" indexName="idx_events_customer_status_v2">
+            <column name="customer_id"/>
+            <column name="status"/>
+        </createIndex>
+        
+        <createIndex tableName="event_history" indexName="idx_event_history_customer_completion">
+            <column name="customer_id"/>
+            <column name="completion_time"/>
+        </createIndex>
+        
+    </changeSet>
+
+</databaseChangeLog>

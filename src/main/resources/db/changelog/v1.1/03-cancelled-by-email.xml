@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="018-convert-cancelled-by-to-text" author="event-scheduler-team">
+        <comment>Convert cancelled_by from UUID to TEXT (email)</comment>
+        <modifyDataType tableName="events" columnName="cancelled_by" newDataType="TEXT"/>
+    </changeSet>
+
+</databaseChangeLog>

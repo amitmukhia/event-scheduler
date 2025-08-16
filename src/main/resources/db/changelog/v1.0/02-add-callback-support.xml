@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="008-add-callback-to-events" author="event-scheduler-team">
+        <comment>Add callback column to events table for custom SQS/Kafka topic routing</comment>
+        <addColumn tableName="events">
+            <column name="callback" type="JSONB"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="009-add-callback-to-event-history" author="event-scheduler-team">
+        <comment>Add callback column to event_history table to preserve callback info</comment>
+        <addColumn tableName="event_history">
+            <column name="callback" type="JSONB"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="010-add-callback-to-failed-events" author="event-scheduler-team">
+        <comment>Add callback column to failed_events table for debugging</comment>
+        <addColumn tableName="failed_events">
+            <column name="callback" type="JSONB"/>
+        </addColumn>
+    </changeSet>
+
+    	<changeSet id="011-add-callback-index" author="event-scheduler-team" runInTransaction="false">
+        	<comment>Add index for events with callbacks (partial index for performance)</comment>
+        	<sql>
+            CREATE INDEX CONCURRENTLY idx_events_callback ON events(event_id) WHERE callback IS NOT NULL;
+        	</sql>
+        	<rollback>
+            DROP INDEX IF EXISTS idx_events_callback;
+        	</rollback>
+    	</changeSet>
+
+    <changeSet id="012-add-callback-comments" author="event-scheduler-team">
+        <comment>Add comments to explain callback structure</comment>
+        <sql>
+            COMMENT ON COLUMN events.callback IS 'Callback configuration: {"includeMetadata": bool, "messagebrokers": [{"type": "SQS|KAFKA", "topics": ["topic1", "topic2"]}]}';
+            COMMENT ON COLUMN event_history.callback IS 'Original callback configuration from event';
+            COMMENT ON COLUMN failed_events.callback IS 'Original callback configuration from event';
+        </sql>
+        <rollback>
+            COMMENT ON COLUMN events.callback IS '';
+            COMMENT ON COLUMN event_history.callback IS '';
+            COMMENT ON COLUMN failed_events.callback IS '';
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

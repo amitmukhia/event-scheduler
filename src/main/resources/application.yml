@@ -1,0 +1,189 @@
+spring:
+  application:
+    name: ${DEPLOYMENT_NAME:event-scheduler-uuid}
+  kafka:
+    consumer:
+      ack-mode: manual_immediate  # Enable manual acknowledgment
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/events_db}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    hikari:
+      auto-commit: true
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:30}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 200
+        order_inserts: true
+        order_updates: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+    drop-first: false
+    contexts: production
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    timeout: ${REDIS_TIMEOUT:2000ms}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DATABASE:0}
+  cache:
+    type: redis
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      deployment: ${DEPLOYMENT_NAME:unknown}
+      environment: ${ENVIRONMENT:unknown}
+      customer: ${CUSTOMER_NAME:unknown}
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+
+server:
+  port: ${SERVER_PORT:8080}
+
+kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  topic: ${KAFKA_MAIN_TOPIC:events.out}
+  topics:
+    event-submission: ${KAFKA_TOPIC_SUBMISSION:event.submissions}
+    scheduled-events: ${KAFKA_TOPIC_SCHEDULED:event.scheduled}
+    ready-events: ${KAFKA_TOPIC_READY:event.ready}
+    timestamp-processing: ${KAFKA_TOPIC_TIMESTAMP:timestamp.processing}
+    processing: ${KAFKA_TOPIC_PROCESSING:process-kafka-message}
+  streams:
+    application-id: ${KAFKA_STREAMS_APP_ID:event-scheduler-streams}
+    processing:
+      guarantee: exactly_once_v2
+    replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
+  producer:
+    # OPTIMIZED: Increased batch size for better throughput
+    batch-size: ${KAFKA_PRODUCER_BATCH_SIZE:65536}  # 64KB batches
+    linger-ms: ${KAFKA_PRODUCER_LINGER:10}          # Wait 10ms to batch more messages
+    buffer-memory: ${KAFKA_PRODUCER_BUFFER:67108864} # 64MB buffer
+    acks: ${KAFKA_PRODUCER_ACKS:1}                   # Leader acknowledgment for balance of speed/durability
+    retries: ${KAFKA_PRODUCER_RETRIES:5}             # More retries for reliability
+    # Additional optimizations
+    compression-type: ${KAFKA_PRODUCER_COMPRESSION:lz4}  # Fast compression
+    max-in-flight-requests-per-connection: ${KAFKA_PRODUCER_MAX_INFLIGHT:5}
+    enable-idempotence: ${KAFKA_PRODUCER_IDEMPOTENCE:true}  # Prevent duplicates
+  consumer:
+    group-id: ${KAFKA_CONSUMER_GROUP:event-processors}
+    auto-offset-reset: ${KAFKA_CONSUMER_OFFSET_RESET:earliest}
+    max-poll-records: ${KAFKA_CONSUMER_MAX_POLL:500}
+    fetch-min-size: ${KAFKA_CONSUMER_FETCH_MIN:1024}
+    heartbeat-interval: ${KAFKA_CONSUMER_HEARTBEAT:3000}
+    session-timeout: ${KAFKA_CONSUMER_SESSION_TIMEOUT:30000}
+    enable-auto-commit: false  # Disable auto-commit for manual acknowledgment
+    concurrency: ${KAFKA_CONSUMER_CONCURRENCY:10}
+
+# AWS SQS Configuration (disabled by default)
+aws:
+  sqs:
+    enabled: ${SQS_ENABLED:true}
+    queue-name: ${SQS_QUEUE_NAME:}
+    region: ${AWS_REGION:us-east-1}
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+
+# Event Scheduler Configuration
+event-scheduler:
+  batch-size: ${BATCH_SIZE:500}
+  execution-interval: ${EXECUTION_INTERVAL:5000}
+  watchdog-interval: ${WATCHDOG_INTERVAL:300000}
+  cleanup-interval: ${CLEANUP_INTERVAL:600000}
+  stuck-event-threshold-minutes: ${STUCK_EVENT_THRESHOLD:15}
+  db:
+    max-retries: ${DB_MAX_RETRIES:3}
+    retry-base-delay-ms: ${DB_RETRY_DELAY:1000}
+  # Redis TTL-based orchestration for high throughput (1000+ events/min)
+  redis-ttl:
+    look-ahead-hours: ${REDIS_TTL_LOOKAHEAD:1}  # How far ahead to schedule Redis TTL keys
+    max-keys-per-hour: ${REDIS_TTL_MAX_KEYS:60}  # Maximum Redis keys created per hour (minute granularity)
+  # Watchdog Configuration
+  watchdog:
+    stuck-event-threshold-minutes: ${WATCHDOG_STUCK_THRESHOLD:15}  # Time after which PROCESSING events are considered stuck
+    check-interval-ms: ${WATCHDOG_CHECK_INTERVAL:300000}         # How often to check for stuck events (5 minutes)
+    failed-event-check-interval-ms: ${WATCHDOG_FAILED_CHECK:600000}  # How often to handle failed events (10 minutes)
+    batch-size: ${WATCHDOG_BATCH_SIZE:100}                    # Batch size for watchdog operations
+    enable-customer-isolation: ${WATCHDOG_CUSTOMER_ISOLATION:true}    # Enable per-customer stuck event handling
+    enable-health-monitoring: ${WATCHDOG_HEALTH_MONITORING:true}     # Enable watchdog health endpoints
+  # Per-customer processing configuration
+  customer:
+    max-parallel-processing: ${CUSTOMER_MAX_PARALLEL:10}
+    processing-timeout-minutes: ${CUSTOMER_PROCESSING_TIMEOUT:30}
+    enable-per-customer-metrics: ${CUSTOMER_METRICS_ENABLED:true}
+    batch-grouping-enabled: ${CUSTOMER_BATCH_GROUPING:true}  # Group events by customer for processing efficiency
+  
+  # Cleanup operations configuration
+  cleanup:
+    # Daily audit configuration
+    audit:
+      enabled: ${CLEANUP_AUDIT_ENABLED:true}
+      schedule: ${CLEANUP_AUDIT_SCHEDULE:0 0 2 * * *}  # 2 AM daily
+      batch-size: ${CLEANUP_AUDIT_BATCH_SIZE:100}
+      batch-delay-ms: ${CLEANUP_AUDIT_BATCH_DELAY:50}
+    
+    # Rate limiting configuration
+    rate-limiting:
+      enabled: ${CLEANUP_RATE_LIMITING_ENABLED:true}
+      
+      # History operations rate limiting (moving events to history table)
+      history:
+        token-bucket:
+          capacity: ${CLEANUP_HISTORY_TOKEN_CAPACITY:20}        # Allow burst of 20 operations
+          refill-rate: ${CLEANUP_HISTORY_TOKEN_REFILL:3}        # 3 operations per second sustained
+        sliding-window:
+          window-minutes: ${CLEANUP_HISTORY_WINDOW_MINUTES:1}   # 1 minute sliding window
+          max-operations: ${CLEANUP_HISTORY_MAX_OPS:150}        # Max 150 history operations per minute
+      
+      # Database cleanup rate limiting (deletion operations)
+      database:
+        token-bucket:
+          capacity: ${CLEANUP_DB_TOKEN_CAPACITY:10}             # Allow burst of 10 operations
+          refill-rate: ${CLEANUP_DB_TOKEN_REFILL:2}             # 2 operations per second sustained
+        sliding-window:
+          window-minutes: ${CLEANUP_DB_WINDOW_MINUTES:5}        # 5 minute sliding window
+          max-operations: ${CLEANUP_DB_MAX_OPS:100}             # Max 100 database operations per 5 minutes
+
+# App-specific Kafka configuration
+app:
+  kafka:
+    topics:
+      timestamp-processing: ${KAFKA_TOPIC_TIMESTAMP:timestamp.processing}
+    consumer:
+      group-id: ${KAFKA_TIMESTAMP_CONSUMER_GROUP:timestamp-processors}
+      concurrency: ${KAFKA_TIMESTAMP_CONCURRENCY:3}
+
+# Logging configuration for shared binary deployment
+logging:
+  level:
+    com.example.eventscheduler: ${LOG_LEVEL:INFO}
+    org.springframework.kafka: ${KAFKA_LOG_LEVEL:WARN}
+    org.springframework.transaction: ${TRANSACTION_LOG_LEVEL:WARN}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%logger{36}] [deployment=${DEPLOYMENT_NAME:unknown}] [customer=${CUSTOMER_NAME:unknown}] - %msg%n"
+  file:
+    name: ${LOG_FILE:logs/event-scheduler-${DEPLOYMENT_NAME:default}.log}

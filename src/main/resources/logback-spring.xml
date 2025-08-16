@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Resolve app name and host/container identifier -->
+    <springProperty scope="context" name="springAppName" source="spring.application.name"/>
+    <springProperty scope="context" name="hostId" source="HOSTNAME"/>
+    <springProperty scope="context" name="hostWin" source="COMPUTERNAME"/>
+
+    <!-- Desired pattern: "2025-08-12 13:31:02.179 INFO trace_id:... span_id:...  - [app-name] [host] message" -->
+    <property name="logPattern" value="%d{YYYY-MM-dd HH:mm:ss.SSS} %5p trace_id:%X{traceId} span_id:%X{spanId}  - [${springAppName:-unknown}] [${hostId:-${hostWin:-unknown}}] %msg%n"/>
+
+    <!-- Console appender -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${logPattern}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Default and test profiles -->
+    <springProfile name="default | test">
+        <root level="info">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+
+    <!-- Dev-like environments -->
+    <springProfile name="dev | uat | qat">
+        <root level="info">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+
+    <!-- Staging and production -->
+    <springProfile name="staging | production">
+        <root level="info">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+</configuration>
+

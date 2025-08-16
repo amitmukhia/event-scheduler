@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <!-- Include individual changelog files -->
+    
+    <!-- V1: Initial Schema -->
+    <include file="db/changelog/v1.0/01-fresh-initial-schema.xml"/>
+    
+    <!-- V2: Add callback support -->
+    <include file="db/changelog/v1.0/02-add-callback-support.xml"/>
+    
+    <!-- V3: Drop removed columns -->
+    <include file="db/changelog/v1.0/03-drop-removed-columns.xml"/>
+    
+    <!-- V1001: Add events version -->
+    <include file="db/changelog/v1.1/01-add-events-version.xml"/>
+    
+    <!-- V1002: Add indexes -->
+    <include file="db/changelog/v1.1/02-add-indexes.xml"/>
+    
+    <!-- V1003: Convert cancelled_by to email -->
+    <include file="db/changelog/v1.1/03-cancelled-by-email.xml"/>
+
+</databaseChangeLog>
