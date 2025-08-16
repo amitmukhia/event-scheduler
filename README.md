@@ -14,7 +14,42 @@ Aligned with provided DB design (UUIDs + JSONB + history). Replaces Pulsar with 
 - Watchdog uses last_attempt_time to reset stuck items
 - Cleanup archives COMPLETED to event_history and deletes old completed rows
 
-## Run
+## Quickstart
 ```bash
-docker compose up -d      # start postgres + kafka + redis if added
-mvn spring-boot:run
+# build using the Maven Wrapper (no global Maven install needed)
+./mvnw -v
+./mvnw clean verify
+
+# run infra
+docker compose up -d
+
+# run the app
+./mvnw spring-boot:run
+```
+
+## Testing
+- Unit tests: JUnit 5 via Surefire (pattern: *Test.java, *Tests.java)
+- Integration tests: Failsafe (pattern: *IT.java) using Testcontainers for Postgres/Kafka/Redis
+- Coverage: JaCoCo report at target/site/jacoco/index.html
+
+```bash
+./mvnw -Ptest clean verify    # runs unit + integration tests
+```
+
+## Database Migrations (Liquibase)
+- Changelogs: src/main/resources/db/changelog
+- Best practices: immutable changesets with id/author, separate DDL/DML, contexts for test data
+- Validate changesets:
+```bash
+./mvnw -Plocal liquibase:validate
+```
+
+## CI/CD
+GitHub Actions workflow builds on Java 21, runs Checkstyle, SpotBugs, tests, and uploads reports.
+
+## Contributing
+- Checkstyle and SpotBugs run in verify phase and fail the build on violations.
+- Follow .editorconfig and .gitattributes for consistent formatting and line endings.
+
+## License
+Apache-2.0. See LICENSE.

@@ -1,0 +1,12 @@
+name: Renovate
+
+overrideConfig: |
+  extends: [config:recommended]
+  packageRules:
+    - matchManagers: ["maven"]
+      automerge: true
+      automergeType: branch
+    - matchManagers: ["github-actions"]
+      automerge: true
+      automergeType: branch
+

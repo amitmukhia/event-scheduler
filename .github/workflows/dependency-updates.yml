@@ -1,0 +1,25 @@
+name: Dependency updates
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  maven-dependency-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Check Maven dependency updates
+        run: ./mvnw -B -q versions:display-dependency-updates versions:display-plugin-updates || true
+      - name: Create issue with report
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Automated dependency updates report"
+          content-filepath: target/dependency-updates-report.txt
+          labels: dependencies, automation
+

@@ -160,7 +160,7 @@
     </dependency>
   </dependencies>
 
-  <build>
+<build>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
@@ -173,6 +173,7 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
+          <release>${java.version}</release>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>
@@ -183,6 +184,33 @@
         </configuration>
       </plugin>
       
+      <!-- Enforce build hygiene -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>enforce-versions</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>${java.version}</version>
+                </requireJavaVersion>
+                <dependencyConvergence/>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
       <!-- JaCoCo for code coverage -->
       <plugin>
         <groupId>org.jacoco</groupId>
@@ -201,9 +229,9 @@
               <goal>report</goal>
             </goals>
           </execution>
-          <!-- Temporarily disabled coverage check to allow build to pass
           <execution>
             <id>jacoco-check</id>
+            <phase>verify</phase>
             <goals>
               <goal>check</goal>
             </goals>
@@ -215,29 +243,53 @@
                     <limit>
                       <counter>LINE</counter>
                       <value>COVEREDRATIO</value>
-                      <minimum>0.39</minimum>
+                      <minimum>0.50</minimum>
                     </limit>
                   </limits>
                 </rule>
               </rules>
             </configuration>
           </execution>
-          -->
         </executions>
       </plugin>
       
-      <!-- Maven Surefire for running tests -->
+      <!-- Unit tests with JUnit 5 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
         <configuration>
+          <useModulePath>false</useModulePath>
           <includes>
             <include>**/*Test.java</include>
             <include>**/*Tests.java</include>
-            <include>**/*IT.java</include>
           </includes>
+          <excludes>
+            <exclude>**/*IT.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
+
+      <!-- Integration tests -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.2.5</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+            <configuration>
+              <includes>
+                <include>**/*IT.java</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
       <!-- Checkstyle for code style enforcement -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -245,19 +297,47 @@
         <version>3.3.1</version>
         <executions>
           <execution>
-            <id>validate</id>
-            <phase>validate</phase>
+            <id>style-verify</id>
+            <phase>verify</phase>
             <goals>
               <goal>check</goal>
             </goals>
             <configuration>
               <configLocation>checkstyle.xml</configLocation>
               <consoleOutput>true</consoleOutput>
-              <failsOnError>false</failsOnError>
+              <failsOnError>true</failsOnError>
             </configuration>
           </execution>
         </executions>
       </plugin>
+
+      <!-- SpotBugs static analysis -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.8.6.5</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Low</threshold>
+          <failOnError>true</failOnError>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>spotbugs</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Versions plugin (run manually) -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.17.1</version>
+      </plugin>
+
       <plugin>
         <groupId>org.liquibase</groupId>
         <artifactId>liquibase-maven-plugin</artifactId>
@@ -265,12 +345,21 @@
         <configuration>
           <changeLogFile>db/changelog/db.changelog-master.xml</changeLogFile>
           <searchPath>src/main/resources</searchPath>
-          <url>jdbc:postgresql://localhost:5432/events_db</url>
-          <username>postgres</username>
-          <password>postgres</password>
+          <url>${liquibase.url}</url>
+          <username>${liquibase.username}</username>
+          <password>${liquibase.password}</password>
           <driver>org.postgresql.Driver</driver>
-          <contexts>production</contexts>
+          <contexts>${liquibase.contexts}</contexts>
         </configuration>
+        <executions>
+          <execution>
+            <id>liquibase-validate</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>validate</goal>
+            </goals>
+          </execution>
+        </executions>
         <dependencies>
           <dependency>
             <groupId>org.postgresql</groupId>
@@ -281,4 +370,34 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>ci</id>
+      <properties>
+        <liquibase.url>jdbc:postgresql://localhost:5432/events_db</liquibase.url>
+        <liquibase.username>postgres</liquibase.username>
+        <liquibase.password>postgres</liquibase.password>
+        <liquibase.contexts>production</liquibase.contexts>
+      </properties>
+    </profile>
+    <profile>
+      <id>local</id>
+      <properties>
+        <liquibase.url>jdbc:postgresql://localhost:5432/events_db</liquibase.url>
+        <liquibase.username>postgres</liquibase.username>
+        <liquibase.password>postgres</liquibase.password>
+        <liquibase.contexts>production</liquibase.contexts>
+      </properties>
+    </profile>
+    <profile>
+      <id>test</id>
+      <properties>
+        <liquibase.contexts>test</liquibase.contexts>
+        <liquibase.url>jdbc:postgresql://localhost:5432/events_db</liquibase.url>
+        <liquibase.username>postgres</liquibase.username>
+        <liquibase.password>postgres</liquibase.password>
+      </properties>
+    </profile>
+  </profiles>
 </project>

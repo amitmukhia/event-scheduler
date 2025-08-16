@@ -1,0 +1,14 @@
+# Handle line endings and diff for generated artifacts
+* text=auto eol=lf
+
+# Treat shell scripts as text
+*.sh text eol=lf
+
+# Mark jar/zip/binary as binary
+*.jar binary
+*.zip binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.ico binary
+
